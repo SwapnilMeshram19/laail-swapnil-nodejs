@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request, RequestParamHandler, Response } from 'express';
 import { lender, borrower } from "../models/userModel";
 import { contract } from '../models/contractModel';
 
@@ -35,69 +35,143 @@ export const createContract = async (req: Request, res: Response) => {
         })
 
     }
-
-
-
 }
 
+//interface for results
 interface resultI {
-    LenderName: string | undefined,
+    LenderId: string | undefined,
     Total: number,
     borrowerCount: number
 }
 
+interface finalResultI {
+    LenderName: string | undefined,
+    Total: number,
+}
 
+interface recordsResultI {
+    LenderName: string | undefined,
+    Total: number,
+}
+
+const checkAvailable = (lenderId: string | undefined, result: resultI[]) => {
+    let value: boolean = true;
+    result.forEach((ele) => {
+        if (ele.LenderId == lenderId) {
+            value = false;
+        } else {
+            value = true;
+        }
+    })
+
+    return value;
+
+}
+
+//geting query params and evaluating
 export const getContract = async (req: Request, res: Response) => {
     try {
 
         // requesting contract as per query
-
-        let n = req.query.n;
-        console.log(n)
+        let { borrower, records, sort }: any = req.query;
         let data = await contract.find();
-        let result: resultI[] = []
-        let resl = data.forEach(async (ele, index) => {
-            let lenderId = ele.LenderId?.toString();
-            let lenderData = await lender.findOne({ _id: lenderId });
-            let lenderName = lenderData?.Name;
-            let checkValue: boolean = checkAvailable(lenderName, result);
-            if (checkValue) {
-                result.push({ LenderName: lenderName, Total: ele.Principle, borrowerCount: 1 });
-                for (let i = index + 1; i < data.length; i++) {
-                    if (data[i].LenderId?.toString() == lenderId) {
-                        result.forEach((resEle) => {
-                            if (resEle.LenderName == lenderName) {
-                                resEle.Total = resEle.Total + ele.Principle;
-                                resEle.borrowerCount += 1;
-                            }
-                        })
-                    }
-                }
+        if (borrower) {
+            let result: resultI[] = []
 
-            } else {
-                result.forEach((resEle) => {
-                    if (resEle.LenderName == lenderName) {
-                        resEle.Total += ele.Principle;
-                        resEle.borrowerCount += 1;
-                    }
-                })
+            data.forEach((ele, index) => {
+                let lenderId = ele.LenderId?.toString();
+                let checkValue: boolean = checkAvailable(lenderId, result);
+                if (checkValue) {
+                    result.push({ LenderId: lenderId, Total: ele.Principle, borrowerCount: 1 });
 
-
-            }
-
-        })
-        const checkAvailable = (lenderName: string | undefined, result: resultI[]) => {
-            let value: boolean = true;
-            result.forEach((ele) => {
-                if (ele.LenderName == lenderName) {
-                    // console.log(ele.LenderName,lenderName)
-                    value = false;
                 } else {
-                    value = true;
+                    for (let i = index; i < data.length; i++) {
+                        if (data[i].LenderId?.toString() == lenderId) {
+                            result.forEach((resEle) => {
+                                if (resEle.LenderId == lenderId) {
+                                    resEle.Total += ele.Principle;
+                                    resEle.borrowerCount += 1;
+                                }
+                            })
+                        }
+                    }
                 }
             })
+            let finalResult: finalResultI[] = []
 
-            return value;
+            result.forEach(async (ele, index) => {
+                try {
+                    if (ele.borrowerCount >= parseInt(borrower)) {
+                        let lenderData = await lender.findOne({ _id: ele.LenderId })
+                        finalResult.push({ LenderName: lenderData?.Name, Total: ele.Total });
+                        if (index == result.length - 1) {
+                            return res.send({
+                                response: "success",
+                                data: finalResult
+                            })
+                        }
+                    }
+
+                } catch (error) {
+                    console.log(error)
+                }
+
+            })
+
+        } else if (sort) {
+            let result: resultI[] = []
+
+            data.forEach((ele, index) => {
+                let lenderId = ele.LenderId?.toString();
+                let checkValue: boolean = checkAvailable(lenderId, result);
+                if (checkValue) {
+                    result.push({ LenderId: lenderId, Total: ele.Principle, borrowerCount: 1 });
+
+                } else {
+                    for (let i = index; i < data.length; i++) {
+                        if (data[i].LenderId?.toString() == lenderId) {
+                            result.forEach((resEle) => {
+                                if (resEle.LenderId == lenderId) {
+                                    resEle.Total += ele.Principle;
+                                    resEle.borrowerCount += 1;
+                                }
+                            })
+                        }
+                    }
+                }
+            })
+            let finalResult: recordsResultI[] = []
+
+            result.forEach(async (ele, index) => {
+                try {
+                    let lenderData = await lender.findOne({ _id: ele.LenderId })
+                    finalResult.push({ LenderName: lenderData?.Name, Total: ele.borrowerCount });
+
+                    finalResult.sort((a, b) => {
+                        return a.Total - b.Total;
+                    })
+
+
+
+
+                    if (index == result.length - 1) {
+                        return res.send({
+                            response: "success",
+                            data: finalResult
+                        })
+                    }
+
+
+
+
+
+
+
+                } catch (error) {
+                    console.log(error)
+                }
+
+            })
         }
 
 
