@@ -18,14 +18,14 @@ User Routes
 
 for POST request
 [http://localhost:4500/user/lender](http://localhost:4500/user/lender)
-`\n`
+` `
 
 [http://localhost:4500/user/borrower](http://localhost:4500/user/borrower)
 
 
 for GET request
 [http://localhost:4500/user/lenders](http://localhost:4500/user/lenders) 
-`\n`
+` `
 
 [http://localhost:4500/user/borrowers](http://localhost:4500/user/borrowers)
 
